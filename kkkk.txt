@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اتحاد الشاغلين - لؤلؤة بورسعيد (النسخة الماسية v9 المحدثة)</title>
+    <meta name="theme-color" content="#1e3a8a">
+    
+    <!-- روابط تحويل الملف إلى تطبيق PWA محمل ومستقل -->
+    <link rel="manifest" href="manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('تم تسجيل التطبيق بنجاح في النظام!'))
+            .catch(err => console.log('خطأ في تسجيل التطبيق:', err));
+        });
+      }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        @media print { .no-print { display: none; } .print-only { display: block !important; } body { background-color: white; } }
+        .print-only { display: none; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.25rem; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 bg-blue-900 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-96 text-center mx-4">
+            <h1 class="text-2xl font-bold text-blue-900 mb-6">نظام إدارة اتحاد الشاغلين</h1>
+            <input type="text" id="username" placeholder="اسم المستخدم" class="w-full p-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-blue-500" value="admin">
+            <input type="password" id="password" placeholder="كلمة المرور" class="w-full p-3 border rounded-xl mb-6 outline-none focus:ring-2 focus:ring-blue-500" value="admin">
+            <button onclick="login()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg">دخول النظام</button>
+            <p id="loginError" class="text-red-500 mt-4 hidden">بيانات الدخول غير صحيحة</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden min-h-screen pb-20">
+        <!-- Header -->
+        <header class="bg-blue-900 text-white p-4 sticky top-0 z-40 shadow-lg no-print">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <div>
+                    <h1 class="text-lg font-bold">اتحاد الشاغلين - لؤلؤة بورسعيد</h1>
+                    <p class="text-[10px] opacity-80">نظام الإدارة الماسية التطبيقي (v9)</p>
+                </div>
+                <button onclick="logout()" class="bg-red-500/20 hover:bg-red-500 p-2 rounded-lg transition">🚪</button>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="max-w-6xl mx-auto p-4 grid grid-cols-2 md:grid-cols-4 gap-3 no-print">
+            <div class="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <p class="text-xs opacity-80">رصيد الخزينة الحالي</p>
+                <h3 id="cashBalance" class="text-xl font-bold">0 ج.م</h3>
+            </div>
+            <div class="card bg-gradient-to-br from-indigo-500 to-indigo-700 text-white">
+                <p class="text-xs opacity-80">رصيد البنك الحالي</p>
+                <h3 id="bankBalance" class="text-xl font-bold">0 ج.م</h3>
+            </div>
+            <div class="card bg-gradient-to-br from-red-500 to-red-700 text-white">
+                <p class="text-xs opacity-80">مصروفات الشهر</p>
+                <h3 id="totalExpenses" class="text-xl font-bold">0 ج.م</h3>
+            </div>
+            <div class="card bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <p class="text-xs opacity-80">إجمالي المتأخرات</p>
+                <h3 id="totalArrears" class="text-xl font-bold">0 ج.م</h3>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto px-4">
+            <!-- Tabs Navigation -->
+            <div class="flex overflow-x-auto gap-2 mb-6 scrollbar-hide no-print">
+                <button onclick="showTab('units')" class="tab-btn active bg-blue-600 text-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">🏠 الوحدات</button>
+                <button onclick="showTab('expenses')" class="tab-btn bg-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">💸 المصروفات</button>
+                <button onclick="showTab('budget')" class="tab-btn bg-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">📊 الميزانية</button>
+                <button onclick="showTab('services')" class="tab-btn bg-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">🛠️ الخدمات</button>
+                <button onclick="showTab('logs')" class="tab-btn bg-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">📝 سجل النشاط</button>
+                <button onclick="showTab('sync')" class="tab-btn bg-white px-6 py-2 rounded-xl shadow-sm font-bold whitespace-nowrap">🔄 مزامنة الأجهزة</button>
+            </div>
+
+            <!-- Units Tab -->
+            <div id="unitsTab" class="tab-content active">
+                <div class="card mb-6 no-print flex flex-wrap gap-3 items-center">
+                    <input type="text" id="unitSearch" oninput="searchUnits()" placeholder="بحث برقم الشقة أو الاسم..." class="flex-1 min-w-[200px] p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="exportToExcel()" class="bg-gray-700 text-white px-4 py-3 rounded-xl font-bold">تصدير Excel</button>
+                </div>
+                <div class="card overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-2">رقم الشقة</th>
+                                <th class="p-2">المالك</th>
+                                <th class="p-2">الساكن</th>
+                                <th class="p-2">النوع</th>
+                                <th class="p-2">الاشتراك</th>
+                                <th class="p-2">المتأخرات</th>
+                                <th class="p-2">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unitsTableBody"></tbody>
+                    </table>
+                </div>
+                
+                <!-- Add/Edit Form -->
+                <div class="card mt-6 no-print">
+                    <h3 class="text-md font-bold mb-4 text-blue-900">إضافة / تعديل وحدة سكنية</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="unitNum" placeholder="رقم الشقة" class="p-2 border rounded-lg">
+                        <input type="text" id="unitOwner" placeholder="اسم المالك" class="p-2 border rounded-lg">
+                        <input type="text" id="unitTenant" placeholder="اسم الساكن" class="p-2 border rounded-lg">
+                        <select id="unitType" class="p-2 border rounded-lg">
+                            <option value="سكني">سكني</option>
+                            <option value="تجاري">تجاري</option>
+                        </select>
+                        <input type="number" id="unitFee" placeholder="الاشتراك الشهري" class="p-2 border rounded-lg">
+                        <input type="number" id="unitArrears" placeholder="المتأخرات" class="p-2 border rounded-lg">
+                    </div>
+                    <button onclick="addOrUpdateUnit()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">حفظ الوحدة</button>
+                </div>
+            </div>
+
+            <!-- Expenses Tab -->
+            <div id="expensesTab" class="tab-content">
+                <div class="card mb-6">
+                    <h3 class="text-md font-bold mb-4 text-blue-900">تسجيل مصروف جديد</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input type="text" id="expTitle" placeholder="بيان المصروف" class="p-2 border rounded-lg">
+                        <input type="number" id="expAmount" placeholder="المبلغ (ج.م)" class="p-2 border rounded-lg">
+                        <select id="expCategory" class="p-2 border rounded-lg">
+                            <option value="صيانة">صيانة وأعطال</option>
+                            <option value="كهرباء">كهرباء ومياه</option>
+                            <option value="نظافة">نظافة وأمن</option>
+                            <option value="أخرى">مصاريف أخرى</option>
+                        </select>
+                    </div>
+                    <button onclick="addExpense()" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold">تسجيل المصروف</button>
+                </div>
+                <div class="card overflow-x-auto">
+                    <table class="w-full text-right text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-2">التاريخ</th>
+                                <th class="p-2">البيان</th>
+                                <th class="p-2">الفئة</th>
+                                <th class="p-2">المبلغ</th>
+                                <th class="p-2">حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expensesTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Budget Tab -->
+            <div id="budgetTab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="card">
+                        <h3 class="text-md font-bold mb-4 text-blue-900">التحليل المالي للشهر الحالي</h3>
+                        <canvas id="financialChart" width="400" height="250"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-md font-bold mb-4 text-blue-900">تحديث الحسابات الافتتاحية</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">الرصيد الافتتاحي للخزينة</label>
+                                <input type="number" id="initCash" class="p-2 border rounded-lg w-full" onchange="updateInitBalances()">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">الرصيد الافتتاحي للبنك</label>
+                                <input type="number" id="initBank" class="p-2 border rounded-lg w-full" onchange="updateInitBalances()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Tab -->
+            <div id="servicesTab" class="tab-content">
+                <div class="card mb-6">
+                    <h3 class="text-md font-bold mb-4 text-blue-900">جدولة أعمال صيانة أو خدمة بالبرج</h3>
+                    <div class="flex gap-3">
+                        <input type="text" id="maintTitle" placeholder="عنوان أعمال الصيانة المقررة..." class="flex-1 p-3 border rounded-xl outline-none">
+                        <button onclick="saveMaintenance()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">إضافة لجدول الأعمال</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <table class="w-full text-right text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-2">التاريخ</th>
+                                <th class="p-2">العمل المخطط له</th>
+                                <th class="p-2">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="maintenanceTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logsTab" class="tab-content">
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-md font-bold text-blue-900">سجل النشاط والعمليات الموثقة بالنظام</h3>
+                        <button onclick="clearLogs()" class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">مسح السجل</button>
+                    </div>
+                    <div class="overflow-y-auto max-h-96 text-xs space-y-2" id="logsContainer"></div>
+                </div>
+            </div>
+
+            <!-- Sync Tab -->
+            <div id="syncTab" class="tab-content">
+                <div class="card space-y-4">
+                    <h3 class="text-md font-bold text-blue-900">نقل ومزامنة البيانات يدوياً (للتحديث المشترك)</h3>
+                    <p class="text-xs text-gray-600">يمكنك تصدير كود مشفر يجمع بياناتك ولصقه في أي جهاز آخر لمشاركة وتوحيد العمليات السكنية والمالية فوراً.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="exportSystemData()" class="bg-blue-600 text-white p-3 rounded-lg font-bold text-xs shadow">تصدير ملف البيانات الكاملة 📥</button>
+                        <button onclick="importSystemData()" class="bg-green-600 text-white p-3 rounded-lg font-bold text-xs shadow">استيراد وتحميل البيانات 📤</button>
+                    </div>
+                    <div class="hidden" id="syncBox">
+                        <textarea id="syncTextArea" rows="4" class="w-full p-2 border rounded-lg font-mono text-xs mt-2" placeholder="أدخل كود المزامنة المشفر هنا..."></textarea>
+                        <button id="syncConfirmBtn" class="mt-2 w-full bg-gray-800 text-white py-2 rounded-lg text-xs font-bold"></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        const DEFAULT_STATE = {
+            units: [
+                { number: "101", ownerName: "أحمد محمد", tenantName: "أحمد محمد", type: "سكني", monthlyFee: 150, arrears: 0 },
+                { number: "102", ownerName: "محمود علي", tenantName: "خالد حسن", type: "سكني", monthlyFee: 150, arrears: 300 }
+            ],
+            expenses: [
+                { id: 1, date: "2026/05/12", title: "صيانة إنارة السلم الرئيسي", category: "صيانة", amount: 450 }
+            ],
+            maintenance: [
+                { id: 1, date: "2026/06/05", title: "غسيل وتطهير خزانات المياه العلوية" }
+            ],
+            logs: [{ timestamp: new Date().toLocaleString('ar-EG'), action: "تم تشغيل نظام اتحاد الشاغلين وتفعيله كتطبيق مستقل." }],
+            initBalances: { cash: 5000, bank: 45000 }
+        };
+
+        let state = DEFAULT_STATE;
+
+        function loadState() {
+            const saved = localStorage.getItem('al_farouk_diamond_state');
+            if (saved) {
+                try {
+                    state = JSON.parse(saved);
+                } catch(e) {
+                    state = DEFAULT_STATE;
+                }
+            } else {
+                state = DEFAULT_STATE;
+                saveState();
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem('al_farouk_diamond_state', JSON.stringify(state));
+        }
+
+        function logAction(actionText) {
+            state.logs.push({ timestamp: new Date().toLocaleString('ar-EG'), action: actionText });
+            saveState();
+            renderLogs();
+        }
+
+        function login() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            loadState();
+            updateUI();
+        }
+
+        function logout() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('app').classList.add('hidden');
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('bg-blue-600', 'text-white'));
+            document.getElementById(tabId + 'Tab').classList.add('active');
+            event.currentTarget.classList.add('bg-blue-600', 'text-white');
+        }
+
+        function updateUI() {
+            renderUnitsTable();
+            renderExpensesTable();
+            renderMaintenanceTable();
+            renderLogs();
+            calculateFinancials();
+        }
+
+        function renderUnitsTable(filterText = '') {
+            const tbody = document.getElementById('unitsTableBody');
+            tbody.innerHTML = '';
+            state.units.filter(u => u.number.includes(filterText) || u.ownerName.includes(filterText)).forEach(u => {
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-2 font-bold">${u.number}</td>
+                        <td class="p-2">${u.ownerName}</td>
+                        <td class="p-2">${u.tenantName}</td>
+                        <td class="p-2">${u.type}</td>
+                        <td class="p-2 text-blue-700">${u.monthlyFee} ج.م</td>
+                        <td class="p-2 ${u.arrears > 0 ? 'text-red-600 font-bold' : 'text-green-600'}">${u.arrears} ج.م</td>
+                        <td class="p-2"><button onclick="deleteUnit('${u.number}')" class="text-red-500">🗑️</button></td>
+                    </tr>`;
+            });
+        }
+
+        function searchUnits() {
+            renderUnitsTable(document.getElementById('unitSearch').value);
+        }
+
+        function addOrUpdateUnit() {
+            const num = document.getElementById('unitNum').value;
+            const owner = document.getElementById('unitOwner').value;
+            if(!num || !owner) return alert('الرجاء إدخال البيانات الأساسية للشقة.');
+            
+            const existingIdx = state.units.findIndex(u => u.number === num);
+            const unitData = {
+                number: num, ownerName: owner, tenantName: document.getElementById('unitTenant').value || owner,
+                type: document.getElementById('unitType').value,
+                monthlyFee: parseFloat(document.getElementById('unitFee').value) || 0,
+                arrears: parseFloat(document.getElementById('unitArrears').value) || 0
+            };
+
+            if(existingIdx > -1) {
+                state.units[existingIdx] = unitData;
+                logAction(`تم تحديث بيانات الشقة رقم ${num}`);
+            } else {
+                state.units.push(unitData);
+                logAction(`تم إضافة وحدة جديدة برقم ${num}`);
+            }
+            saveState(); updateUI();
+            ['unitNum', 'unitOwner', 'unitTenant', 'unitFee', 'unitArrears'].forEach(id => document.getElementById(id).value = '');
+        }
+
+        function deleteUnit(num) {
+            if(confirm('هل تود حذف هذه الوحدة؟')) {
+                state.units = state.units.filter(u => u.number !== num);
+                logAction(`تم حذف الوحدة رقم ${num}`);
+                saveState(); updateUI();
+            }
+        }
+
+        function renderExpensesTable() {
+            document.getElementById('expensesTableBody').innerHTML = state.expenses.slice().reverse().map(e => `
+                <tr class="border-b">
+                    <td class="p-2 text-gray-400">${e.date}</td>
+                    <td class="p-2 font-medium">${e.title}</td>
+                    <td class="p-2"><span class="px-2 py-0.5 bg-gray-100 rounded text-xs">${e.category}</span></td>
+                    <td class="p-2 text-red-600 font-bold">${e.amount} ج.م</td>
+                    <td class="p-2"><button onclick="deleteExpense(${e.id})" class="text-red-500">🗑️</button></td>
+                </tr>`).join('');
+        }
+
+        function addExpense() {
+            const title = document.getElementById('expTitle').value;
+            const amount = parseFloat(document.getElementById('expAmount').value) || 0;
+            if(!title || amount <= 0) return alert('برجاء مراجعة بيانات المصروف.');
+
+            state.expenses.push({ id: Date.now(), date: new Date().toLocaleDateString('ar-EG'), title, category: document.getElementById('expCategory').value, amount });
+            logAction(`تم تسجيل مصروف جديد: ${title} بقيمة ${amount} ج.م`);
+            saveState(); updateUI();
+            document.getElementById('expTitle').value = ''; document.getElementById('expAmount').value = '';
+        }
+
+        function deleteExpense(id) {
+            state.expenses = state.expenses.filter(e => e.id !== id);
+            logAction('تم حذف بند مصروفات من المنظومة.');
+            saveState(); updateUI();
+        }
+
+        function renderMaintenanceTable() {
+            document.getElementById('maintenanceTableBody').innerHTML = state.maintenance.slice().reverse().map(m => `
+                <tr class="border-b">
+                    <td class="p-2">${m.date}</td>
+                    <td class="p-2 font-medium">${m.title}</td>
+                    <td class="p-2"><button onclick="deleteMaint(${m.id})" class="text-red-500">🗑️</button></td>
+                </tr>`).join('');
+        }
+
+        function saveMaintenance() {
+            const title = document.getElementById('maintTitle').value;
+            if(!title) return;
+            state.maintenance.push({ id: Date.now(), date: new Date().toLocaleDateString('ar-EG'), title });
+            logAction(`تم جدولة مهمة صيانة: ${title}`);
+            document.getElementById('maintTitle').value = '';
+            saveState(); updateUI();
+        }
+
+        function deleteMaint(id) {
+            state.maintenance = state.maintenance.filter(m => m.id !== id);
+            saveState(); updateUI();
+        }
+
+        function renderLogs() {
+            document.getElementById('logsContainer').innerHTML = state.logs.slice().reverse().map(l => `
+                <div class="p-2 bg-gray-50 border-r-2 border-blue-600 rounded text-[11px]">
+                    <span class="text-gray-400 font-mono">[${l.timestamp}]</span> ${l.action}
+                </div>`).join('');
+        }
+
+        function clearLogs() {
+            state.logs = [{ timestamp: new Date().toLocaleString('ar-EG'), action: "تم تصفير سجل النشاط." }];
+            saveState(); renderLogs();
+        }
+
+        function calculateFinancials() {
+            let arrears = 0; state.units.forEach(u => arrears += (u.arrears || 0));
+            let expenses = 0; state.expenses.forEach(e => expenses += e.amount);
+
+            document.getElementById('initCash').value = state.initBalances.cash;
+            document.getElementById('initBank').value = state.initBalances.bank;
+
+            let currentCash = state.initBalances.cash - (expenses * 0.4);
+            let currentBank = state.initBalances.bank - (expenses * 0.6);
+
+            document.getElementById('cashBalance').innerText = `${currentCash.toFixed(0)} ج.م`;
+            document.getElementById('bankBalance').innerText = `${currentBank.toFixed(0)} ج.م`;
+            document.getElementById('totalExpenses').innerText = `${expenses} ج.م`;
+            document.getElementById('totalArrears').innerText = `${arrears} ج.م`;
+
+            renderChart(currentCash, currentBank, expenses, arrears);
+        }
+
+        function updateInitBalances() {
+            state.initBalances.cash = parseFloat(document.getElementById('initCash').value) || 0;
+            state.initBalances.bank = parseFloat(document.getElementById('initBank').value) || 0;
+            logAction("تم تحديث الأرصدة الحسابية الافتتاحية للمشروع.");
+            saveState(); calculateFinancials();
+        }
+
+        let myChart = null;
+        function renderChart(cash, bank, exp, arr) {
+            const ctx = document.getElementById('financialChart');
+            if(!ctx) return;
+            if(myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['خزينة', 'بنك', 'مصروفات', 'متأخرات'],
+                    datasets: [{
+                        data: [cash, bank, exp, arr],
+                        backgroundColor: ['#3b82f6', '#6366f1', '#ef4444', '#f97316'],
+                        borderRadius: 6
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function exportToExcel() {
+            let csv = "\ufeffرقم الشقة,المالك,الساكن,النوع,الاشتراك,المتأخرات\n";
+            state.units.forEach(u => { csv += `${u.number},${u.ownerName},${u.tenantName},${u.type},${u.monthlyFee},${u.arrears}\n`; });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            link.download = "تقرير_اتحاد_الشاغلين.csv"; link.click();
+        }
+
+        function exportSystemData() {
+            const dataStr = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+            const box = document.getElementById('syncBox'); box.classList.remove('hidden');
+            const txt = document.getElementById('syncTextArea'); txt.value = dataStr; txt.select();
+            
+            const btn = document.getElementById('syncConfirmBtn');
+            btn.className = "mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold w-full";
+            btn.innerText = "نسخ كود المزامنة التلقائي";
+            btn.onclick = function() {
+                txt.select(); document.execCommand('copy');
+                alert('تم نسخ كود التصدير! أرسله لأي جهاز وقم بعمل استيراد هناك.');
+            };
+        }
+
+        function importSystemData() {
+            const box = document.getElementById('syncBox'); box.classList.remove('hidden');
+            const txt = document.getElementById('syncTextArea'); txt.value = '';
+            
+            const btn = document.getElementById('syncConfirmBtn');
+            btn.className = "mt-2 bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold w-full";
+            btn.innerText = "تأكيد دمج واستيراد البيانات للبرنامج";
+            btn.onclick = function() {
+                try {
+                    const decoded = JSON.parse(decodeURIComponent(escape(atob(txt.value.trim()))));
+                    if(decoded.units) {
+                        state = decoded; saveState(); updateUI();
+                        alert('تمت مزامنة البيانات وتحديث التطبيق بنجاح!');
+                        box.classList.add('hidden');
+                    }
+                } catch(e) { alert('الكود غير صحيح أو تالف.'); }
+            };
+        }
+    </script>
+</body>
+</html>
